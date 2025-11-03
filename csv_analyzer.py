@@ -3,8 +3,8 @@ import numpy as np
 from typing import Dict, Any, List, Tuple
 
 
-class DataAnalyzer:
-    """Generic analyzer for any data that provides insights and statistics."""
+class CSVDataAnalyzer:
+    """Analyzer for CSV data that provides insights and statistics."""
     
     def __init__(self, df: pd.DataFrame):
         """

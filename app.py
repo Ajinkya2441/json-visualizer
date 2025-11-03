@@ -3,15 +3,164 @@ import pandas as pd
 import json
 import os
 from json_utils import load_json_file, json_to_dataframe, get_json_structure, validate_json_format
-from data_analyzer import JSONDataAnalyzer
+from data_analyzer import DataAnalyzer
 from visualizer import JSONVisualizer
 import plotly.graph_objects as go
 import tempfile
+from typing import Dict, Any, List, Tuple
+import numpy as np
+
+
+def process_data_file(df: pd.DataFrame, uploaded_file, temp_file_path: str):
+    """
+    Process a DataFrame and display analysis results.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to analyze
+        uploaded_file: Uploaded file object
+        temp_file_path (str): Path to temporary file
+    """
+    # Display basic information
+    st.markdown('<h2 class="sub-header">File Information</h2>', unsafe_allow_html=True)
+    file_size = os.path.getsize(temp_file_path)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f'<div class="info-box"><strong>File name:</strong> {uploaded_file.name}</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="info-box"><strong>File size:</strong> {file_size / (1024*1024):.2f} MB</div>', unsafe_allow_html=True)
+    
+    # Display data preview
+    st.markdown('<h2 class="sub-header">Data Preview</h2>', unsafe_allow_html=True)
+    st.dataframe(df.head(10), width='stretch')
+    
+    # Initialize analyzer and visualizer
+    analyzer = DataAnalyzer(df)
+    visualizer = JSONVisualizer(df)
+    
+    # Display basic info
+    info = analyzer.get_basic_info()
+    st.markdown('<h2 class="sub-header">Dataset Overview</h2>', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(f'''
+        <div class="metric-card">
+            <div class="metric-value">{info['shape'][0]}</div>
+            <div class="metric-label">ROWS</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'''
+        <div class="metric-card">
+            <div class="metric-value">{info['shape'][1]}</div>
+            <div class="metric-label">COLUMNS</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'''
+        <div class="metric-card">
+            <div class="metric-value">{len(info['numeric_columns'])}</div>
+            <div class="metric-label">NUMERIC COLS</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with col4:
+        st.markdown(f'''
+        <div class="metric-card">
+            <div class="metric-value">{len(info['categorical_columns'])}</div>
+            <div class="metric-label">CATEGORY COLS</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    # Summary statistics
+    st.markdown('<h2 class="sub-header">Statistical Summary</h2>', unsafe_allow_html=True)
+    summary_stats = analyzer.get_summary_statistics()
+    if not summary_stats.empty:
+        st.dataframe(summary_stats, width='stretch')
+    else:
+        st.markdown('<div class="warning-box">No numeric columns found for summary statistics.</div>', unsafe_allow_html=True)
+    
+    # Missing data
+    st.markdown('<h2 class="sub-header">Missing Data Analysis</h2>', unsafe_allow_html=True)
+    missing_data = analyzer.get_missing_data_info()
+    if not missing_data.empty:
+        st.dataframe(missing_data, width='stretch')
+    else:
+        st.markdown('<div class="success-box">No missing data found in the dataset.</div>', unsafe_allow_html=True)
+    
+    # Visualization section
+    st.markdown('<h2 class="sub-header">Data Visualization</h2>', unsafe_allow_html=True)
+    
+    # Get column lists
+    numeric_columns = analyzer.numeric_columns
+    categorical_columns = analyzer.categorical_columns
+    
+    # Tabs for different visualizations
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Histograms", "📊 Bar Charts", "📊 Scatter Plots", "📊 Correlation"])
+    
+    with tab1:
+        if numeric_columns:
+            selected_col = st.selectbox("Select a numeric column for histogram", numeric_columns, key="hist")
+            if st.button("Generate Histogram", key="hist_btn"):
+                try:
+                    fig = visualizer.create_histogram(selected_col)
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.markdown(f'<div class="error-box">Error generating histogram: {str(e)}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="warning-box">No numeric columns available for histograms.</div>', unsafe_allow_html=True)
+    
+    with tab2:
+        if categorical_columns:
+            selected_col = st.selectbox("Select a categorical column for bar chart", categorical_columns, key="bar")
+            if st.button("Generate Bar Chart", key="bar_btn"):
+                try:
+                    fig = visualizer.create_bar_chart(selected_col)
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.markdown(f'<div class="error-box">Error generating bar chart: {str(e)}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="warning-box">No categorical columns available for bar charts.</div>', unsafe_allow_html=True)
+    
+    with tab3:
+        if len(numeric_columns) >= 2:
+            col1, col2 = st.columns(2)
+            x_col = col1.selectbox("X-axis", numeric_columns, key="scatter_x")
+            y_col = col2.selectbox("Y-axis", [col for col in numeric_columns if col != x_col], key="scatter_y")
+            
+            color_col = st.selectbox("Color (optional)", [None] + categorical_columns + numeric_columns, key="scatter_color")
+            if color_col == "None":
+                color_col = None
+            
+            if st.button("Generate Scatter Plot", key="scatter_btn"):
+                try:
+                    if color_col:
+                        fig = visualizer.create_scatter_plot(x_col, y_col, color_col)
+                    else:
+                        fig = visualizer.create_scatter_plot(x_col, y_col)
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.markdown(f'<div class="error-box">Error generating scatter plot: {str(e)}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="warning-box">Need at least 2 numeric columns for scatter plots.</div>', unsafe_allow_html=True)
+    
+    with tab4:
+        if len(numeric_columns) >= 2:
+            if st.button("Generate Correlation Heatmap", key="corr_btn"):
+                try:
+                    fig = visualizer.create_correlation_heatmap()
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.markdown(f'<div class="error-box">Error generating correlation heatmap: {str(e)}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="warning-box">Need at least 2 numeric columns for correlation analysis.</div>', unsafe_allow_html=True)
+    
+    # Show full dataset
+    st.markdown('<h2 class="sub-header">Complete Dataset</h2>', unsafe_allow_html=True)
+    st.dataframe(df, width='stretch')
 
 
 # Set page configuration
 st.set_page_config(
-    page_title="JSON Data Analyzer & Visualizer",
+    page_title="Universal Data Analyzer & Visualizer",
     page_icon="📊",
     layout="wide"
 )
@@ -243,261 +392,363 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title and description
-st.markdown('<h1 class="main-header">📊 JSON Data Analyzer & Visualizer</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">📊 Universal Data Analyzer & Visualizer</h1>', unsafe_allow_html=True)
 st.markdown("""
 <div style="text-align: center; max-width: 800px; margin: 0 auto 2rem auto; font-size: 1.1rem;">
-    A professional tool for comprehensive analysis and visualization of JSON data files up to 24MB in size. 
-    Upload your JSON file to explore its structure, analyze statistics, and create interactive visualizations.
+    A professional tool for comprehensive analysis and visualization of various data formats up to 24MB in size. 
+    Upload your data file to explore its structure, analyze statistics, and create interactive visualizations.
 </div>
 """, unsafe_allow_html=True)
 
-# File uploader
-uploaded_file = st.file_uploader("Choose a JSON file (max 24MB)", type="json")
+# File uploader - now supporting multiple file types
+uploaded_file = st.file_uploader("Choose a data file (max 24MB)", type=["json", "csv", "xlsx", "xls", "parquet", "tsv"])
 
 if uploaded_file is not None:
     # Create a temporary file to store the uploaded content
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_file:
+    file_extension = uploaded_file.name.split('.')[-1].lower()
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as tmp_file:
         tmp_file.write(uploaded_file.getvalue())
         temp_file_path = tmp_file.name
     
     try:
-        # Validate JSON format
-        if not validate_json_format(temp_file_path):
-            st.markdown('<div class="error-box">Invalid JSON format. Please upload a valid JSON file.</div>', unsafe_allow_html=True)
-            st.markdown('<div class="solution-box"><div class="solution-title">How to fix JSON format issues:</div><ul><li>Ensure your file contains valid JSON syntax</li><li>Check for missing commas, brackets, or quotes</li><li>Use a JSON validator to identify syntax errors</li><li>Ensure the file encoding is UTF-8</li></ul></div>', unsafe_allow_html=True)
-        else:
-            # Load JSON data
-            json_data = load_json_file(temp_file_path)
-            
-            # Display basic information
-            st.markdown('<h2 class="sub-header">File Information</h2>', unsafe_allow_html=True)
-            file_size = os.path.getsize(temp_file_path)
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f'<div class="info-box"><strong>File name:</strong> {uploaded_file.name}</div>', unsafe_allow_html=True)
-            with col2:
-                st.markdown(f'<div class="info-box"><strong>File size:</strong> {file_size / (1024*1024):.2f} MB</div>', unsafe_allow_html=True)
-            
-            # Display JSON structure
-            st.markdown('<h2 class="sub-header">Data Structure</h2>', unsafe_allow_html=True)
-            with st.expander("View JSON structure details", expanded=False):
-                structure = get_json_structure(json_data)
-                st.json(structure)
-            
-            # Convert to DataFrame
-            try:
-                df = json_to_dataframe(json_data)
+        if file_extension == "json":
+            # Handle JSON files
+            # Validate JSON format
+            if not validate_json_format(temp_file_path):
+                st.markdown('<div class="error-box">Invalid JSON format. Please upload a valid JSON file.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="solution-box"><div class="solution-title">How to fix JSON format issues:</div><ul><li>Ensure your file contains valid JSON syntax</li><li>Check for missing commas, brackets, or quotes</li><li>Use a JSON validator to identify syntax errors</li><li>Ensure the file encoding is UTF-8</li></ul></div>', unsafe_allow_html=True)
+            else:
+                # Load JSON data
+                json_data = load_json_file(temp_file_path)
                 
-                # Display data preview
-                st.markdown('<h2 class="sub-header">Data Preview</h2>', unsafe_allow_html=True)
-                st.dataframe(df.head(10), width='stretch')
-                
-                # Initialize analyzer and visualizer
-                analyzer = JSONDataAnalyzer(json_data)
-                visualizer = JSONVisualizer(df)
-                
-                # Display basic info
-                info = analyzer.get_basic_info()
-                st.markdown('<h2 class="sub-header">Dataset Overview</h2>', unsafe_allow_html=True)
-                col1, col2, col3, col4 = st.columns(4)
+                # Display basic information
+                st.markdown('<h2 class="sub-header">File Information</h2>', unsafe_allow_html=True)
+                file_size = os.path.getsize(temp_file_path)
+                col1, col2 = st.columns(2)
                 with col1:
-                    st.markdown(f'''
-                    <div class="metric-card">
-                        <div class="metric-value">{info['shape'][0]}</div>
-                        <div class="metric-label">ROWS</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'<div class="info-box"><strong>File name:</strong> {uploaded_file.name}</div>', unsafe_allow_html=True)
                 with col2:
-                    st.markdown(f'''
-                    <div class="metric-card">
-                        <div class="metric-value">{info['shape'][1]}</div>
-                        <div class="metric-label">COLUMNS</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                with col3:
-                    st.markdown(f'''
-                    <div class="metric-card">
-                        <div class="metric-value">{len(info['numeric_columns'])}</div>
-                        <div class="metric-label">NUMERIC COLS</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                with col4:
-                    st.markdown(f'''
-                    <div class="metric-card">
-                        <div class="metric-value">{len(info['categorical_columns'])}</div>
-                        <div class="metric-label">CATEGORY COLS</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'<div class="info-box"><strong>File size:</strong> {file_size / (1024*1024):.2f} MB</div>', unsafe_allow_html=True)
                 
-                # Summary statistics
-                st.markdown('<h2 class="sub-header">Statistical Summary</h2>', unsafe_allow_html=True)
-                summary_stats = analyzer.get_summary_statistics()
-                if not summary_stats.empty:
-                    st.dataframe(summary_stats, width='stretch')
-                else:
-                    st.markdown('<div class="warning-box">No numeric columns found for summary statistics.</div>', unsafe_allow_html=True)
+                # Display JSON structure
+                st.markdown('<h2 class="sub-header">Data Structure</h2>', unsafe_allow_html=True)
+                with st.expander("View JSON structure details", expanded=False):
+                    structure = get_json_structure(json_data)
+                    st.json(structure)
                 
-                # Missing data
-                st.markdown('<h2 class="sub-header">Missing Data Analysis</h2>', unsafe_allow_html=True)
-                missing_data = analyzer.get_missing_data_info()
-                if not missing_data.empty:
-                    st.dataframe(missing_data, width='stretch')
-                else:
-                    st.markdown('<div class="success-box">No missing data found in the dataset.</div>', unsafe_allow_html=True)
-                
-                # Visualization section
-                st.markdown('<h2 class="sub-header">Data Visualization</h2>', unsafe_allow_html=True)
-                
-                # Get column lists
-                numeric_columns = analyzer.numeric_columns
-                categorical_columns = analyzer.categorical_columns
-                
-                # Tabs for different visualizations
-                tab1, tab2, tab3, tab4 = st.tabs(["📊 Histograms", "📊 Bar Charts", "📊 Scatter Plots", "📊 Correlation"])
-                
-                with tab1:
-                    if numeric_columns:
-                        selected_col = st.selectbox("Select a numeric column for histogram", numeric_columns, key="hist")
-                        if st.button("Generate Histogram", key="hist_btn"):
-                            try:
-                                fig = visualizer.create_histogram(selected_col)
-                                st.plotly_chart(fig, use_container_width=True)
-                            except Exception as e:
-                                st.markdown(f'<div class="error-box">Error generating histogram: {str(e)}</div>', unsafe_allow_html=True)
+                # Convert to DataFrame
+                try:
+                    df = json_to_dataframe(json_data)
+                    
+                    # Display data preview
+                    st.markdown('<h2 class="sub-header">Data Preview</h2>', unsafe_allow_html=True)
+                    st.dataframe(df.head(10), width='stretch')
+                    
+                    # Initialize analyzer and visualizer
+                    analyzer = DataAnalyzer(df)  # Use generic analyzer
+                    visualizer = JSONVisualizer(df)
+                    
+                    # Process data (same as before)
+                    # Display basic info
+                    info = analyzer.get_basic_info()
+                    st.markdown('<h2 class="sub-header">Dataset Overview</h2>', unsafe_allow_html=True)
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.markdown(f'''
+                        <div class="metric-card">
+                            <div class="metric-value">{info['shape'][0]}</div>
+                            <div class="metric-label">ROWS</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f'''
+                        <div class="metric-card">
+                            <div class="metric-value">{info['shape'][1]}</div>
+                            <div class="metric-label">COLUMNS</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    with col3:
+                        st.markdown(f'''
+                        <div class="metric-card">
+                            <div class="metric-value">{len(info['numeric_columns'])}</div>
+                            <div class="metric-label">NUMERIC COLS</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    with col4:
+                        st.markdown(f'''
+                        <div class="metric-card">
+                            <div class="metric-value">{len(info['categorical_columns'])}</div>
+                            <div class="metric-label">CATEGORY COLS</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    # Summary statistics
+                    st.markdown('<h2 class="sub-header">Statistical Summary</h2>', unsafe_allow_html=True)
+                    summary_stats = analyzer.get_summary_statistics()
+                    if not summary_stats.empty:
+                        st.dataframe(summary_stats, width='stretch')
                     else:
-                        st.markdown('<div class="warning-box">No numeric columns available for histograms.</div>', unsafe_allow_html=True)
-                
-                with tab2:
-                    if categorical_columns:
-                        selected_col = st.selectbox("Select a categorical column for bar chart", categorical_columns, key="bar")
-                        if st.button("Generate Bar Chart", key="bar_btn"):
-                            try:
-                                fig = visualizer.create_bar_chart(selected_col)
-                                st.plotly_chart(fig, use_container_width=True)
-                            except Exception as e:
-                                st.markdown(f'<div class="error-box">Error generating bar chart: {str(e)}</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="warning-box">No numeric columns found for summary statistics.</div>', unsafe_allow_html=True)
+                    
+                    # Missing data
+                    st.markdown('<h2 class="sub-header">Missing Data Analysis</h2>', unsafe_allow_html=True)
+                    missing_data = analyzer.get_missing_data_info()
+                    if not missing_data.empty:
+                        st.dataframe(missing_data, width='stretch')
                     else:
-                        st.markdown('<div class="warning-box">No categorical columns available for bar charts.</div>', unsafe_allow_html=True)
-                
-                with tab3:
-                    if len(numeric_columns) >= 2:
-                        col1, col2 = st.columns(2)
-                        x_col = col1.selectbox("X-axis", numeric_columns, key="scatter_x")
-                        y_col = col2.selectbox("Y-axis", [col for col in numeric_columns if col != x_col], key="scatter_y")
-                        
-                        color_col = st.selectbox("Color (optional)", [None] + categorical_columns + numeric_columns, key="scatter_color")
-                        if color_col == "None":
-                            color_col = None
-                        
-                        if st.button("Generate Scatter Plot", key="scatter_btn"):
-                            try:
-                                if color_col:
-                                    fig = visualizer.create_scatter_plot(x_col, y_col, color_col)
-                                else:
-                                    fig = visualizer.create_scatter_plot(x_col, y_col)
-                                st.plotly_chart(fig, use_container_width=True)
-                            except Exception as e:
-                                st.markdown(f'<div class="error-box">Error generating scatter plot: {str(e)}</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="success-box">No missing data found in the dataset.</div>', unsafe_allow_html=True)
+                    
+                    # Visualization section
+                    st.markdown('<h2 class="sub-header">Data Visualization</h2>', unsafe_allow_html=True)
+                    
+                    # Get column lists
+                    numeric_columns = analyzer.numeric_columns
+                    categorical_columns = analyzer.categorical_columns
+                    
+                    # Tabs for different visualizations
+                    tab1, tab2, tab3, tab4 = st.tabs(["📊 Histograms", "📊 Bar Charts", "📊 Scatter Plots", "📊 Correlation"])
+                    
+                    with tab1:
+                        if numeric_columns:
+                            selected_col = st.selectbox("Select a numeric column for histogram", numeric_columns, key="hist")
+                            if st.button("Generate Histogram", key="hist_btn"):
+                                try:
+                                    fig = visualizer.create_histogram(selected_col)
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.markdown(f'<div class="error-box">Error generating histogram: {str(e)}</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="warning-box">No numeric columns available for histograms.</div>', unsafe_allow_html=True)
+                    
+                    with tab2:
+                        if categorical_columns:
+                            selected_col = st.selectbox("Select a categorical column for bar chart", categorical_columns, key="bar")
+                            if st.button("Generate Bar Chart", key="bar_btn"):
+                                try:
+                                    fig = visualizer.create_bar_chart(selected_col)
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.markdown(f'<div class="error-box">Error generating bar chart: {str(e)}</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="warning-box">No categorical columns available for bar charts.</div>', unsafe_allow_html=True)
+                    
+                    with tab3:
+                        if len(numeric_columns) >= 2:
+                            col1, col2 = st.columns(2)
+                            x_col = col1.selectbox("X-axis", numeric_columns, key="scatter_x")
+                            y_col = col2.selectbox("Y-axis", [col for col in numeric_columns if col != x_col], key="scatter_y")
+                            
+                            color_col = st.selectbox("Color (optional)", [None] + categorical_columns + numeric_columns, key="scatter_color")
+                            if color_col == "None":
+                                color_col = None
+                            
+                            if st.button("Generate Scatter Plot", key="scatter_btn"):
+                                try:
+                                    if color_col:
+                                        fig = visualizer.create_scatter_plot(x_col, y_col, color_col)
+                                    else:
+                                        fig = visualizer.create_scatter_plot(x_col, y_col)
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.markdown(f'<div class="error-box">Error generating scatter plot: {str(e)}</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="warning-box">Need at least 2 numeric columns for scatter plots.</div>', unsafe_allow_html=True)
+                    
+                    with tab4:
+                        if len(numeric_columns) >= 2:
+                            if st.button("Generate Correlation Heatmap", key="corr_btn"):
+                                try:
+                                    fig = visualizer.create_correlation_heatmap()
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.markdown(f'<div class="error-box">Error generating correlation heatmap: {str(e)}</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="warning-box">Need at least 2 numeric columns for correlation analysis.</div>', unsafe_allow_html=True)
+                    
+                    # Show full dataset
+                    st.markdown('<h2 class="sub-header">Complete Dataset</h2>', unsafe_allow_html=True)
+                    st.dataframe(df, width='stretch')
+                    
+                except Exception as e:
+                    st.markdown(f'<div class="error-box"><div class="problem-title">Data Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
+                    
+                    # Provide specific solutions based on error type
+                    error_msg = str(e).lower()
+                    if "arrow" in error_msg and "serialization" in error_msg:
+                        st.markdown('''
+                        <div class="solution-box">
+                            <div class="solution-title">How to resolve DataFrame serialization issues:</div>
+                            <ul>
+                                <li><strong>Complex data types:</strong> Your JSON contains complex nested structures or mixed data types that are difficult to represent in a tabular format</li>
+                                <li><strong>Unsupported objects:</strong> Some columns contain objects (like lists or dictionaries) that cannot be directly displayed in a table</li>
+                                <li><strong>Solutions:</strong>
+                                    <ul>
+                                        <li>Try flattening your JSON structure before uploading</li>
+                                        <li>Convert complex objects to strings before analysis</li>
+                                        <li>Use the "Raw JSON Data" view below to see your data structure</li>
+                                        <li>Consider preprocessing your data to simplify nested structures</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    elif "unhashable type" in error_msg:
+                        st.markdown('''
+                        <div class="solution-box">
+                            <div class="solution-title">How to resolve unhashable type issues:</div>
+                            <ul>
+                                <li><strong>Lists in data:</strong> Your JSON contains arrays or lists as values, which cannot be used for categorical analysis</li>
+                                <li><strong>Nested objects:</strong> Complex nested structures may cause processing issues</li>
+                                <li><strong>Solutions:</strong>
+                                    <ul>
+                                        <li>Flatten nested arrays into separate columns</li>
+                                        <li>Convert lists to comma-separated strings</li>
+                                        <li>Extract specific elements from arrays for analysis</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    elif "expected bytes" in error_msg:
+                        st.markdown('''
+                        <div class="solution-box">
+                            <div class="solution-title">How to resolve data type conflicts:</div>
+                            <ul>
+                                <li><strong>Mixed data types:</strong> Some columns contain different data types (e.g., numbers and strings)</li>
+                                <li><strong>Encoding issues:</strong> Special characters or encoding problems in your data</li>
+                                <li><strong>Solutions:</strong>
+                                    <ul>
+                                        <li>Ensure consistent data types in each column</li>
+                                        <li>Check for special characters or encoding issues</li>
+                                        <li>Preprocess data to standardize formats</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        ''', unsafe_allow_html=True)
                     else:
-                        st.markdown('<div class="warning-box">Need at least 2 numeric columns for scatter plots.</div>', unsafe_allow_html=True)
+                        st.markdown('''
+                        <div class="solution-box">
+                            <div class="solution-title">General troubleshooting steps:</div>
+                            <ul>
+                                <li><strong>Check data structure:</strong> Review your JSON structure using the "Data Structure" section above</li>
+                                <li><strong>Simplify complexity:</strong> Flatten nested structures if possible</li>
+                                <li><strong>Validate data types:</strong> Ensure consistent data types in arrays and objects</li>
+                                <li><strong>Reduce file size:</strong> If the file is very large, try with a smaller sample</li>
+                                <li><strong>Contact support:</strong> If issues persist, please share the error details with the development team</li>
+                            </ul>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    # Still show the raw JSON structure
+                    st.markdown('<h3 class="section-header">Raw JSON Data</h3>', unsafe_allow_html=True)
+                    st.json(json_data)
+            
+        elif file_extension == "csv":
+            # Handle CSV files
+            try:
+                # Read CSV file
+                df = pd.read_csv(temp_file_path)
                 
-                with tab4:
-                    if len(numeric_columns) >= 2:
-                        if st.button("Generate Correlation Heatmap", key="corr_btn"):
-                            try:
-                                fig = visualizer.create_correlation_heatmap()
-                                st.plotly_chart(fig, use_container_width=True)
-                            except Exception as e:
-                                st.markdown(f'<div class="error-box">Error generating correlation heatmap: {str(e)}</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown('<div class="warning-box">Need at least 2 numeric columns for correlation analysis.</div>', unsafe_allow_html=True)
-                
-                # Show full dataset
-                st.markdown('<h2 class="sub-header">Complete Dataset</h2>', unsafe_allow_html=True)
-                st.dataframe(df, width='stretch')
+                # Process with generic analyzer
+                process_data_file(df, uploaded_file, temp_file_path)
                 
             except Exception as e:
-                st.markdown(f'<div class="error-box"><div class="problem-title">Data Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="error-box"><div class="problem-title">CSV Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
+                st.markdown('''
+                <div class="solution-box">
+                    <div class="solution-title">How to resolve CSV processing issues:</div>
+                    <ul>
+                        <li><strong>File format:</strong> Ensure your file is in valid CSV format</li>
+                        <li><strong>File size:</strong> Check that your file is under 24MB</li>
+                        <li><strong>Encoding:</strong> Make sure the file is saved with UTF-8 encoding</li>
+                        <li><strong>Structure:</strong> Ensure the CSV has a proper header row</li>
+                        <li><strong>Special characters:</strong> Check for unescaped quotes or special characters</li>
+                    </ul>
+                </div>
+                ''', unsafe_allow_html=True)
                 
-                # Provide specific solutions based on error type
-                error_msg = str(e).lower()
-                if "arrow" in error_msg and "serialization" in error_msg:
-                    st.markdown('''
-                    <div class="solution-box">
-                        <div class="solution-title">How to resolve DataFrame serialization issues:</div>
-                        <ul>
-                            <li><strong>Complex data types:</strong> Your JSON contains complex nested structures or mixed data types that are difficult to represent in a tabular format</li>
-                            <li><strong>Unsupported objects:</strong> Some columns contain objects (like lists or dictionaries) that cannot be directly displayed in a table</li>
-                            <li><strong>Solutions:</strong>
-                                <ul>
-                                    <li>Try flattening your JSON structure before uploading</li>
-                                    <li>Convert complex objects to strings before analysis</li>
-                                    <li>Use the "Raw JSON Data" view below to see your data structure</li>
-                                    <li>Consider preprocessing your data to simplify nested structures</li>
-                                </ul>
-                            </li>
-                        </ul>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                elif "unhashable type" in error_msg:
-                    st.markdown('''
-                    <div class="solution-box">
-                        <div class="solution-title">How to resolve unhashable type issues:</div>
-                        <ul>
-                            <li><strong>Lists in data:</strong> Your JSON contains arrays or lists as values, which cannot be used for categorical analysis</li>
-                            <li><strong>Nested objects:</strong> Complex nested structures may cause processing issues</li>
-                            <li><strong>Solutions:</strong>
-                                <ul>
-                                    <li>Flatten nested arrays into separate columns</li>
-                                    <li>Convert lists to comma-separated strings</li>
-                                    <li>Extract specific elements from arrays for analysis</li>
-                                </ul>
-                            </li>
-                        </ul>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                elif "expected bytes" in error_msg:
-                    st.markdown('''
-                    <div class="solution-box">
-                        <div class="solution-title">How to resolve data type conflicts:</div>
-                        <ul>
-                            <li><strong>Mixed data types:</strong> Some columns contain different data types (e.g., numbers and strings)</li>
-                            <li><strong>Encoding issues:</strong> Special characters or encoding problems in your data</li>
-                            <li><strong>Solutions:</strong>
-                                <ul>
-                                    <li>Ensure consistent data types in each column</li>
-                                    <li>Check for special characters or encoding issues</li>
-                                    <li>Preprocess data to standardize formats</li>
-                                </ul>
-                            </li>
-                        </ul>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                else:
-                    st.markdown('''
-                    <div class="solution-box">
-                        <div class="solution-title">General troubleshooting steps:</div>
-                        <ul>
-                            <li><strong>Check data structure:</strong> Review your JSON structure using the "Data Structure" section above</li>
-                            <li><strong>Simplify complexity:</strong> Flatten nested structures if possible</li>
-                            <li><strong>Validate data types:</strong> Ensure consistent data types in arrays and objects</li>
-                            <li><strong>Reduce file size:</strong> If the file is very large, try with a smaller sample</li>
-                            <li><strong>Contact support:</strong> If issues persist, please share the error details with the development team</li>
-                        </ul>
-                    </div>
-                    ''', unsafe_allow_html=True)
+        elif file_extension in ["xlsx", "xls"]:
+            # Handle Excel files
+            try:
+                # Read Excel file
+                df = pd.read_excel(temp_file_path)
                 
-                # Still show the raw JSON structure
-                st.markdown('<h3 class="section-header">Raw JSON Data</h3>', unsafe_allow_html=True)
-                st.json(json_data)
-            
+                # Process with generic analyzer
+                process_data_file(df, uploaded_file, temp_file_path)
+                
+            except Exception as e:
+                st.markdown(f'<div class="error-box"><div class="problem-title">Excel Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
+                st.markdown('''
+                <div class="solution-box">
+                    <div class="solution-title">How to resolve Excel processing issues:</div>
+                    <ul>
+                        <li><strong>File format:</strong> Ensure your file is in valid Excel format (.xlsx or .xls)</li>
+                        <li><strong>File size:</strong> Check that your file is under 24MB</li>
+                        <li><strong>Sheet selection:</strong> Make sure the Excel file has data in its sheets</li>
+                        <li><strong>Protected files:</strong> Ensure the file is not password protected</li>
+                        <li><strong>Corrupted files:</strong> Try opening the file in Excel to check if it's corrupted</li>
+                    </ul>
+                </div>
+                ''', unsafe_allow_html=True)
+                
+        elif file_extension == "parquet":
+            # Handle Parquet files
+            try:
+                # Read Parquet file
+                df = pd.read_parquet(temp_file_path)
+                
+                # Process with generic analyzer
+                process_data_file(df, uploaded_file, temp_file_path)
+                
+            except Exception as e:
+                st.markdown(f'<div class="error-box"><div class="problem-title">Parquet Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
+                st.markdown('''
+                <div class="solution-box">
+                    <div class="solution-title">How to resolve Parquet processing issues:</div>
+                    <ul>
+                        <li><strong>File format:</strong> Ensure your file is in valid Parquet format</li>
+                        <li><strong>File size:</strong> Check that your file is under 24MB</li>
+                        <li><strong>Schema issues:</strong> The Parquet file may have an incompatible schema</li>
+                        <li><strong>Corrupted files:</strong> The file may be corrupted or incomplete</li>
+                    </ul>
+                </div>
+                ''', unsafe_allow_html=True)
+                
+        elif file_extension == "tsv":
+            # Handle TSV files
+            try:
+                # Read TSV file
+                df = pd.read_csv(temp_file_path, sep='\t')
+                
+                # Process with generic analyzer
+                process_data_file(df, uploaded_file, temp_file_path)
+                
+            except Exception as e:
+                st.markdown(f'<div class="error-box"><div class="problem-title">TSV Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
+                st.markdown('''
+                <div class="solution-box">
+                    <div class="solution-title">How to resolve TSV processing issues:</div>
+                    <ul>
+                        <li><strong>File format:</strong> Ensure your file is in valid TSV format</li>
+                        <li><strong>File size:</strong> Check that your file is under 24MB</li>
+                        <li><strong>Encoding:</strong> Make sure the file is saved with UTF-8 encoding</li>
+                        <li><strong>Structure:</strong> Ensure the TSV has a proper header row</li>
+                        <li><strong>Special characters:</strong> Check for unescaped tabs or special characters</li>
+                    </ul>
+                </div>
+                ''', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="error-box">Unsupported file format. Please upload a supported data file.</div>', unsafe_allow_html=True)
+    
     except Exception as e:
         st.markdown(f'<div class="error-box"><div class="problem-title">File Processing Error:</div>{str(e)}</div>', unsafe_allow_html=True)
         st.markdown('''
         <div class="solution-box">
             <div class="solution-title">How to resolve file processing issues:</div>
             <ul>
-                <li><strong>File format:</strong> Ensure your file is in valid JSON format</li>
+                <li><strong>File format:</strong> Ensure your file is in a supported format</li>
                 <li><strong>File size:</strong> Check that your file is under 24MB</li>
                 <li><strong>Encoding:</strong> Make sure the file is saved with UTF-8 encoding</li>
                 <li><strong>Permissions:</strong> Ensure the file is not open in another application</li>
@@ -510,6 +761,6 @@ if uploaded_file is not None:
         if os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
 else:
-    st.markdown('<div class="info-box" style="text-align: center; padding: 2rem;">Please upload a JSON file to begin analysis.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-box" style="text-align: center; padding: 2rem;">Please upload a data file to begin analysis.</div>', unsafe_allow_html=True)
     st.markdown('<h2 class="sub-header">Sample Data</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="info-box">To get started, you can use the sample data provided in <code>sample_data.json</code> in this directory.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-box">To get started, you can use the sample data provided in <code>sample_data.json</code> or <code>sample_data.csv</code> in this directory.</div>', unsafe_allow_html=True)
