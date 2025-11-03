@@ -18,25 +18,6 @@ A professional tool for analyzing and visualizing JSON data files up to 24MB in 
 - **Error Handling**: Detailed error messages with solutions
 - **Data Export**: View and export full dataset
 
-## Professional UI Elements
-
-- Clean, modern design with professional color scheme
-- Custom-styled metric cards for key statistics
-- Color-coded information boxes (info, warning, success, error)
-- Professional tabbed interface for visualizations
-- Responsive layout that works on all device sizes
-- Clear typography hierarchy for better readability
-- Consistent spacing and visual elements
-
-## Enhanced Error Handling
-
-The application provides detailed, actionable feedback when issues occur:
-
-- **Data Processing Errors**: Specific guidance on resolving complex data structures
-- **Format Errors**: Clear instructions for fixing JSON syntax issues
-- **Serialization Issues**: Solutions for handling complex nested data
-- **Type Conflicts**: Guidance on resolving data type inconsistencies
-
 ## Installation
 
 1. Clone or download this repository
@@ -81,7 +62,7 @@ A sample JSON file ([sample_data.json](file:///c:/Users/Ajinkya/Desktop/csv_visu
 - streamlit >= 1.0.0
 - jsonschema >= 4.0.0
 
-## Modules
+## Core Modules
 
 - [app.py](file:///c:/Users/Ajinkya/Desktop/csv_visualization/app.py): Main Streamlit application with professional UI
 - [json_utils.py](file:///c:/Users/Ajinkya/Desktop/csv_visualization/json_utils.py): JSON loading and validation utilities
@@ -89,7 +70,7 @@ A sample JSON file ([sample_data.json](file:///c:/Users/Ajinkya/Desktop/csv_visu
 - [visualizer.py](file:///c:/Users/Ajinkya/Desktop/csv_visualization/visualizer.py): Data visualization components
 - [sample_data.json](file:///c:/Users/Ajinkya/Desktop/csv_visualization/sample_data.json): Sample JSON data for testing
 
-## Professional UI Components
+## Professional UI Features
 
 The application features a professionally designed interface with:
 
@@ -98,10 +79,9 @@ The application features a professionally designed interface with:
 - **Information Boxes**: Color-coded notifications for different message types
 - **Tabbed Navigation**: Organized visualization options
 - **Responsive Layout**: Adapts to different screen sizes
-- **Sidebar Navigation**: Easy access to instructions and information
 - **Dark Mode Support**: Automatic adaptation to system theme preferences
 
-## Error Handling & Troubleshooting
+## Error Handling
 
 When issues occur, the application provides:
 
@@ -109,12 +89,6 @@ When issues occur, the application provides:
 - **Actionable Solutions**: Step-by-step guidance on how to fix problems
 - **Context-Specific Help**: Solutions tailored to the type of error encountered
 - **Raw Data View**: Access to original data when processing fails
-
-Common issues and solutions:
-- **Complex Nested Structures**: Guidance on flattening data
-- **Mixed Data Types**: Instructions for standardizing formats
-- **Serialization Problems**: Solutions for handling special characters
-- **File Format Issues**: Tips for validating JSON syntax
 
 ## File Size Limitations
 
