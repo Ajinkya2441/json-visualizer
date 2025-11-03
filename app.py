@@ -513,29 +513,3 @@ else:
     st.markdown('<div class="info-box" style="text-align: center; padding: 2rem;">Please upload a JSON file to begin analysis.</div>', unsafe_allow_html=True)
     st.markdown('<h2 class="sub-header">Sample Data</h2>', unsafe_allow_html=True)
     st.markdown('<div class="info-box">To get started, you can use the sample data provided in <code>sample_data.json</code> in this directory.</div>', unsafe_allow_html=True)
-
-# Sidebar with instructions
-with st.sidebar:
-    st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
-    st.markdown('<h3 class="sidebar-header">📘 How to Use</h3>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">1. Upload a JSON file (max 24MB)</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">2. Explore the data structure</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">3. View summary statistics</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">4. Create visualizations</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">5. Analyze missing data</div>', unsafe_allow_html=True)
-    
-    st.markdown('<h3 class="sidebar-header">📁 Supported JSON Formats</h3>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">• Flat JSON objects</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">• Nested JSON structures</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">• JSON arrays</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">• Mixed data types</div>', unsafe_allow_html=True)
-    
-    st.markdown('<h3 class="sidebar-header">📏 File Limitations</h3>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">• Maximum file size: 24MB</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item">• Valid JSON format required</div>', unsafe_allow_html=True)
-    
-    st.markdown('<h3 class="sidebar-header">⚠️ Common Issues & Solutions</h3>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item"><strong>Data Processing Errors:</strong> Flatten complex nested structures</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item"><strong>Format Errors:</strong> Validate JSON syntax</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-item"><strong>Size Errors:</strong> Reduce file size or split data</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
