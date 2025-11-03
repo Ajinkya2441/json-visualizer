@@ -21,11 +21,11 @@ def load_json_file(file_path: str) -> Union[Dict[str, Any], list]:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
     
-    # Check file size (5MB limit)
+    # Check file size (24MB limit)
     file_size = os.path.getsize(file_path)
-    max_size = 5 * 1024 * 1024  # 5MB in bytes
+    max_size = 24 * 1024 * 1024  # 24MB in bytes
     if file_size > max_size:
-        raise ValueError(f"File size exceeds 5MB limit. File size: {file_size / (1024*1024):.2f}MB")
+        raise ValueError(f"File size exceeds 24MB limit. File size: {file_size / (1024*1024):.2f}MB")
     
     with open(file_path, 'r', encoding='utf-8') as file:
         try:
